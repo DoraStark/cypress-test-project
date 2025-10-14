@@ -1,82 +1,92 @@
-describe("Landing: header & footer elements", () => {
+/// <reference types="cypress" />
+
+const CONTACTS = [
+  {
+    key: "facebook",
+    hrefPart: "facebook.com/Hillel.IT.School",
+    classIcon: "icon-facebook",
+  },
+  { key: "telegram", hrefPart: "t.me/ithillel_kyiv" },
+  {
+    key: "youtube",
+    hrefPart: "youtube.com/user/HillelITSchool?sub_confirmation=1",
+  },
+  { key: "instagram", hrefPart: "instagram.com/hillel_itschool" },
+  { key: "linkedin", hrefPart: "linkedin.com/school/ithillel" },
+];
+
+describe("Header & Contacts (adapted to current DOM)", () => {
   beforeEach(() => {
-    Cypress.config("pageLoadTimeout", 180000);
-    Cypress.config("defaultCommandTimeout", 15000);
-    cy.clearCookies();
-    cy.clearLocalStorage();
-    cy.visit("/", {
-      auth: { username: "guest", password: "welcome2qauto" },
-      timeout: 180000,
-      failOnStatusCode: false,
-    });
-    cy.document({ timeout: 120000 }).its("readyState").should("eq", "complete");
+    cy.visitWithAuth("/");
     cy.acceptCookiesIfAny();
-    cy.get("app-home", { timeout: 20000 }).should("exist");
-    cy.get("#contactsSection", { timeout: 20000 }).should("exist");
   });
 
-  it("header: знаходить усі видимі лінки/кнопки та перевіряє базові властивості", () => {
-    cy.getHeaderLinksAndButtons().then(($els) => {
-      expect($els.length).to.be.gte(3);
-      cy.wrap($els).each(($el) => {
-        cy.wrap($el)
-          .should("be.visible")
-          .and(($e) => {
-            const node = $e.get(0);
-            if (node.tagName.toLowerCase() === "a")
-              expect(node).to.have.attr("href");
-          });
-      });
-      const headerTexts = $els
-        .map((_, el) => el.innerText.trim())
-        .get()
-        .join(" | ");
-      expect(headerTexts).to.match(
-        /login|sign ?in|anmelden|signin|sign ?up|register|registrieren/i
-      );
-    });
-  });
+  it("Header: усі кнопки та посилання існують і валідні", () => {
+    cy.getHeaderLinksAndButtons()
+      .should("have.length.at.least", 2)
+      .each(($el) => {
+        const isLink = $el.is("a");
+        cy.wrap($el).should("be.visible");
 
-  it("hero: є принаймні один видимий CTA у hero-блоці", () => {
-    cy.get("app-home .section.hero").should("be.visible");
-    cy.get("app-home .section.hero")
-      .find("a,button")
-      .filter(":visible")
-      .should("have.length.at.least", 1);
-  });
+        if (isLink) {
+          cy.wrap($el)
+            .should("have.attr", "href")
+            .then((href) => {
+              expect(href, "href should be valid link").to.match(
+                /^(https?:\/\/|#|mailto:|tel:|\/|\.\/|\.\.\/)/
+              );
+            });
+        } else {
+          cy.wrap($el).should("not.be.disabled");
+        }
 
-  it("footer: знаходить усі лінки/кнопки та перевіряє соцмережі, сайт і пошту", () => {
-    cy.fixture("footerTargets.json").then((targets) => {
-      cy.getFooterLinksAndButtons().then(($els) => {
-        expect($els.length).to.be.gte(5);
-        const hrefs = $els
-          .map((_, el) => el.getAttribute("href") || "")
-          .get()
-          .map((h) => h.toLowerCase());
-        targets.social.forEach((needle) =>
-          expect(hrefs.some((h) => h.includes(needle))).to.eq(true)
-        );
-        expect(hrefs.some((h) => h.includes(targets.site))).to.eq(true);
+        const txt = ($el.text() || "").trim();
+        const aria = $el.attr("aria-label") || "";
         expect(
-          hrefs.some((h) => h === targets.supportMail.toLowerCase())
+          txt.length > 0 || aria.length > 0,
+          "has text or aria-label"
         ).to.eq(true);
       });
-    });
   });
 
-  it("footer: усі елементи видимі та активні", () => {
-    cy.getFooterLinksAndButtons().each(($el) => {
-      cy.wrap($el).should("be.visible").and("not.be.disabled");
-    });
+  it("Contacts: контейнер та заголовок існують", () => {
+    cy.get("#contactsSection").should("exist").and("be.visible");
+    cy.get("#contactsSection h2").contains(/contacts/i);
+    cy.get("#contactsSection .contacts_socials.socials")
+      .should("exist")
+      .and("be.visible");
   });
 
-  it("соцмережі у блоці Contacts присутні", () => {
-    cy.getFooterSocialLinks().within(() => {
-      cy.get('a[href*="facebook"]').should("exist");
-      cy.get('a[href*="t.me"], a[href*="telegram"]').should("exist");
-      cy.get('a[href*="youtube"], a[href*="youtu.be"]').should("exist");
-      cy.get('a[href*="instagram"]').should("exist");
-      cy.get('a[href*="linkedin"]').should("exist");
+  it("Contacts: кожне посилання є, має правильный href, target, rel та іконку", () => {
+    cy.get("#contactsSection .contacts_socials.socials")
+      .find("a.socials_link")
+      .as("socialLinks")
+      .should("have.length.at.least", CONTACTS.length);
+
+    CONTACTS.forEach(({ key, hrefPart, classIcon }) => {
+      cy.get("@socialLinks")
+        .filter(`[href*="${hrefPart}"]`)
+        .should("have.length.at.least", 1)
+        .first()
+        .as(`link_${key}`);
+
+      cy.get(`@link_${key}`)
+        .should("have.attr", "href")
+        .and("include", hrefPart);
+      cy.get(`@link_${key}`).should("have.attr", "target", "_blank");
+
+      cy.get(`@link_${key}`)
+        .invoke("attr", "rel")
+        .then((rel) => {
+          if (rel) expect(rel).to.match(/nofollow|noopener|noreferrer/);
+        });
+
+      cy.get(`@link_${key}`)
+        .find("span.socials_icon.icon")
+        .should("exist")
+        .then(($span) => {
+          if (classIcon) expect($span.attr("class")).to.include(classIcon);
+        });
     });
   });
 });

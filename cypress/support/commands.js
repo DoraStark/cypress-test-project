@@ -1,41 +1,39 @@
-Cypress.Commands.add("acceptCookiesIfAny", () => {
-  const rx =
-    /(accept|agree|ok|allow|got it|zustimmen|einverstanden|akzeptieren|alle.*акzeptieren|принять|согласен)/i;
-  cy.document().then((doc) => {
-    const btn = [...doc.querySelectorAll('button,[role="button"],a')].find(
-      (el) => rx.test(el.textContent || "")
-    );
-    if (btn) cy.wrap(btn).click({ force: true, scrollBehavior: false });
+Cypress.Commands.add("visitWithAuth", (path = "/", options = {}) => {
+  return cy.visit(path, {
+    auth: {
+      username: Cypress.env("BASIC_AUTH_USER"),
+      password: Cypress.env("BASIC_AUTH_PASS"),
+    },
+    ...options,
   });
+});
+
+Cypress.Commands.add("acceptCookiesIfAny", () => {
   const sel =
-    '[aria-label*="Accept"],[aria-label*="Akzeptieren"],.cookie-accept,.cc-allow,.js-accept-cookies,.accept-cookie,' +
-    "#onetrust-accept-btn-handler,#accept-cookies,.ot-sdk-container .ot-sdk-button";
-  cy.get("body").then(($b) => {
-    if ($b.find(sel).length) cy.get(sel).first().click({ force: true });
+    "#onetrust-accept-btn-handler, .cookie-accept, .cc-allow, " +
+    '[aria-label*="Accept"], [aria-label*="Akzeptieren"]';
+  cy.get("body", { includeShadowDom: true }).then(($b) => {
+    if ($b.find(sel).length) {
+      cy.get(sel, { includeShadowDom: true })
+        .filter(":visible")
+        .first()
+        .click({ force: true });
+    }
   });
 });
 
 Cypress.Commands.add("getHeaderLinksAndButtons", () => {
-  const roots = 'header, [data-testid="header"], .header';
+  const roots = 'app-header, header, [data-testid="header"], .header';
   return cy.get("body").then(($b) => {
     const hasNav = $b.find(`${roots} nav`).length > 0;
     const scope = hasNav ? `${roots} nav` : roots;
-    return cy.get(`${scope} a, ${scope} button`).filter(":visible");
+    return cy
+      .get(
+        `${scope} a, ${scope} button, ${scope} [role="button"], ${scope} [role="menuitem"]`
+      )
+      .filter(":visible")
+      .filter(
+        (i, el) => !el.disabled && el.getAttribute("aria-hidden") !== "true"
+      );
   });
-});
-
-Cypress.Commands.add("getFooterLinksAndButtons", () => {
-  const roots = 'footer, [data-testid="footer"], .footer';
-  return cy
-    .get(`${roots} a, ${roots} button`, { timeout: 20000 })
-    .filter(":visible");
-});
-
-Cypress.Commands.add("getFooterSocialLinks", () => {
-  cy.location("pathname", { timeout: 15000 }).then((p) => {
-    if (p !== "/")
-      cy.visit("/", { auth: { username: "guest", password: "welcome2qauto" } });
-  });
-  cy.get("app-home", { timeout: 20000 }).should("exist");
-  return cy.get("#contactsSection .contacts_socials", { timeout: 20000 });
 });
