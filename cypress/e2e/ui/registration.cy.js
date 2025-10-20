@@ -68,3 +68,6 @@ it("Реєстрація через модалку", () => {
     cy.location("pathname", { timeout: 20000 }).should("eq", "/");
   });
 });
+it("Логін через UI", () => {
+  cy.login(email, PWD);
+});

@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 Cypress.Commands.add("visitWithAuth", (path = "/") => {
   cy.visit(`https://guest:welcome2qauto@qauto.forstudy.space${path}`);
 });
@@ -89,4 +91,35 @@ Cypress.Commands.add("logout", () => {
     .click();
 
   cy.location("pathname", { timeout: 15000 }).should("eq", "/");
+});
+
+Cypress.Commands.add("login", (email, password) => {
+  cy.visitWithAuth("/");
+
+  cy.get(
+    'button.header_signin, a.header_signin, button:contains("Sign In"), a:contains("Sign In")'
+  )
+    .first()
+    .should("be.visible")
+    .click({ force: true });
+
+  cy.get('.modal.show, [role="dialog"]').as("loginModal").should("be.visible");
+
+  cy.get("@loginModal").within(() => {
+    cy.contains("label", /^email$/i)
+      .parent()
+      .find("input")
+      .clear()
+      .type(email);
+    cy.contains("label", /^password$/i)
+      .parent()
+      .find("input")
+      .clear()
+      .type(password, { log: false });
+    cy.contains("button", /^login$/i)
+      .should("not.be.disabled")
+      .click();
+  });
+
+  cy.location("pathname", { timeout: 20000 }).should("include", "/panel");
 });
