@@ -37,17 +37,34 @@ it("Реєстрація через модалку", () => {
     cy.contains("button", /^register$/i)
       .should("not.be.disabled")
       .click();
+
+    cy.viewport(1366, 900);
+    cy.location("pathname", { timeout: 20000 }).should(
+      "include",
+      "/panel/garage"
+    );
+
+    cy.get("ngb-modal-window, .modal.show", { timeout: 10000 }).should(
+      "not.exist"
+    );
+
+    cy.document().then((doc) => {
+      const sidebarLogout = doc.querySelector("span.icon-logout");
+      if (sidebarLogout) {
+        cy.wrap(sidebarLogout)
+          .closest("a")
+          .scrollIntoView()
+          .click({ force: true });
+      } else {
+        cy.contains('button,[role="button"]', /my profile/i, {
+          timeout: 10000,
+        }).click();
+        cy.contains("a,button", /^log ?out$/i, { timeout: 10000 }).click({
+          force: true,
+        });
+      }
+    });
+
+    cy.location("pathname", { timeout: 20000 }).should("eq", "/");
   });
-
-  cy.url().should("match", /garage|panel|dashboard/i);
-  cy.contains(/garage|add car/i, { matchCase: false }).should("exist");
-  cy.location("pathname", { timeout: 20000 }).should(
-    "match",
-    /panel\/garage|garage|dashboard/i
-  );
-
-  cy.get("app-panel-layout, .panel-layout", { timeout: 20000 }).should("exist");
-  cy.contains("button,a", /my profile/i, { timeout: 20000 }).should(
-    "be.visible"
-  );
 });

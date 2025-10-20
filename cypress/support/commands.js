@@ -65,3 +65,28 @@ Cypress.Commands.overwrite("type", (orig, el, text, options) => {
   }
   return orig(el, text, options);
 });
+
+Cypress.Commands.add("assertInGarage", () => {
+  cy.location("pathname", { timeout: 20000 }).should(
+    "match",
+    /panel\/garage|garage|dashboard/i
+  );
+  cy.get("app-panel-layout, .panel-layout", { timeout: 20000 }).should("exist");
+});
+
+Cypress.Commands.add("openProfileMenu", () => {
+  cy.contains('button,a,[role="button"]', /my profile/i, { timeout: 15000 })
+    .should("be.visible")
+    .click();
+});
+
+Cypress.Commands.add("logout", () => {
+  cy.get("#userNavDropdown", { timeout: 10000 }).should("be.visible").click();
+
+  cy.get(".user-nav_menu")
+    .should("be.visible")
+    .contains("button", /^logout$/i)
+    .click();
+
+  cy.location("pathname", { timeout: 15000 }).should("eq", "/");
+});
