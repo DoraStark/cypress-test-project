@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "cy:open": "cypress open",
-    "cy:run": "cypress run"
+    "cy:run": "cypress run",
+    "cy:qauto": "cypress run --config-file cypress.config.qauto.js",
+    "cy:qauto2": "cypress run --config-file cypress.config.qauto2.js",
+    "cy:open:qauto": "cypress open --config-file cypress.config.qauto.js",
+    "cy:open:qauto2": "cypress open --config-file cypress.config.qauto2.js"
   },
   "repository": {
     "type": "git",
