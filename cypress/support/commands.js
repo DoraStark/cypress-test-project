@@ -1,7 +1,6 @@
 /// <reference types="cypress" />
 
 console.log("commands.js LOADED v3");
-
 Cypress.Commands.add("visitWithAuth", (path = "/") => {
   const u = Cypress.env("basicAuthUser");
   const p = Cypress.env("basicAuthPass");
@@ -11,7 +10,6 @@ Cypress.Commands.add("visitWithAuth", (path = "/") => {
   url.password = p || "";
   cy.visit(`${url.toString().replace(/\/$/, "")}${path}`);
 });
-
 Cypress.Commands.add("login", (email, password) => {
   cy.visitWithAuth("/panel/login");
 
@@ -29,7 +27,6 @@ Cypress.Commands.add("login", (email, password) => {
   cy.contains("button", /log in|sign in/i, { timeout: 15000 })
     .should("be.visible")
     .click({ force: true });
-
   cy.contains("a,button", /garage|profile|fuel expenses|logout/i, {
     timeout: 20000,
   }).should("be.visible");
@@ -57,7 +54,6 @@ const getFormScope = () =>
     }
     return cy.wrap($b);
   });
-
 Cypress.Commands.add("registerNewUniqueUser", (opts = {}) => {
   const name = opts.name || "John";
   const lastName = opts.lastName || "Doe";
@@ -69,11 +65,9 @@ Cypress.Commands.add("registerNewUniqueUser", (opts = {}) => {
   cy.wrap({ email, password, name, lastName }).as("uniqueUser");
 
   cy.visitWithAuth("/");
-
   cy.contains("a,button", /sign up|register/i, { timeout: 15000 })
     .scrollIntoView()
     .click({ force: true });
-
   getFormScope()
     .find("form, input, button", { timeout: 15000 })
     .should("be.visible");
@@ -87,9 +81,7 @@ Cypress.Commands.add("registerNewUniqueUser", (opts = {}) => {
     if (onLogin)
       cy.contains("button,a", /sign up|register/i).click({ force: true });
   });
-
   cy.intercept("POST", "**/api/auth/signup").as("signup");
-
   getFormScope().within(() => {
     cy.contains("label", /^name$/i)
       .parent()
@@ -132,7 +124,6 @@ Cypress.Commands.add("registerNewUniqueUser", (opts = {}) => {
       });
     }
   });
-
   cy.location("pathname", { timeout: 20000 }).should(
     "include",
     "/panel/garage"
@@ -141,43 +132,79 @@ Cypress.Commands.add("registerNewUniqueUser", (opts = {}) => {
     "be.visible"
   );
 });
-
 Cypress.Commands.add("addCarUI", ({ brand, model, mileage }) => {
   cy.contains("button,a", /^add car$/i, { timeout: 15000 })
     .should("be.visible")
     .click();
-
   cy.get(".modal.show,[role='dialog']", { timeout: 15000 }).as("dlg");
-
   cy.intercept("GET", "**/api/cars/models*").as("models");
-
   cy.get("@dlg")
     .contains("label", /brand/i)
     .parent()
     .find("select")
     .should("be.enabled")
     .select(brand, { force: true });
-
   cy.wait("@models");
-
   cy.get("@dlg")
     .contains("label", /model/i)
     .parent()
     .find("select")
     .should("be.enabled")
     .select(model, { force: true });
-
   cy.get("@dlg")
     .contains("label", /mileage|odometer/i)
     .parent()
     .find("input[type='number'], input")
     .clear()
     .type(String(mileage));
-
   cy.get("@dlg").contains("button,input[type='submit']", /^add$/i).click();
-
   cy.contains(".toast,.alert,[role='status']", /added|success/i, {
     timeout: 15000,
   }).should("be.visible");
   cy.contains(".car, .card, tr", brand, { timeout: 15000 }).should("exist");
 });
+
+Cypress.Commands.add("apiGetCars", () => {
+  return cy.request({
+    method: "GET",
+    url: "/api/cars",
+  });
+});
+
+Cypress.Commands.add(
+  "createExpenseApi",
+  ({ carId, mileage, liters, totalCost, reportDate }) => {
+    const date = reportDate || new Date().toISOString().slice(0, 10);
+
+    return cy
+      .request({
+        method: "POST",
+        url: "/api/expenses",
+        headers: { "Content-Type": "application/json" },
+        body: {
+          carId: Number(carId),
+          mileage: Number(mileage),
+          liters: Number(liters),
+          totalCost: Number(totalCost),
+          reportDate: date,
+        },
+        failOnStatusCode: false,
+      })
+      .then((resp) => {
+        if (![200, 201].includes(resp.status)) {
+          cy.log("Expense create FAILED:", JSON.stringify(resp.body));
+        }
+        expect([200, 201], "expense create status").to.include(resp.status);
+
+        const b = resp.body || {};
+        const exp = b.data ?? b.expense ?? b;
+        expect(exp, "expense in response body").to.exist;
+        expect(Number(exp.carId || exp.car_id)).to.eq(Number(carId));
+        expect(Number(exp.mileage || exp.odometer)).to.eq(Number(mileage));
+        expect(Number(exp.liters || exp.volume)).to.eq(Number(liters));
+        expect(Number(exp.totalCost || exp.price)).to.eq(Number(totalCost));
+
+        return exp;
+      });
+  }
+);

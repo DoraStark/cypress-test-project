@@ -18,10 +18,11 @@ describe("Register Garage + Fuel Expenses (UI, POM)", () => {
   });
 
   it("Добавление расхода топлива к созданной машине", () => {
-    garage.openAddFuelExpenseFor("Audi TT");
+    const mileage = 12500;
+    garage.addCar({ brand: "Audi", model: "TT", mileage });
+    garage.openAddFuelExpenseForMileage(mileage);
 
     expenses.addExpense({ mileage: 12600, liters: 40, totalCost: 70 });
-
     expenses.shouldSeeExpense({ mileage: 12600 });
   });
 });
