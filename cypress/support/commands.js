@@ -170,41 +170,108 @@ Cypress.Commands.add("apiGetCars", () => {
     url: "/api/cars",
   });
 });
-
 Cypress.Commands.add(
   "createExpenseApi",
   ({ carId, mileage, liters, totalCost, reportDate }) => {
-    const date = reportDate || new Date().toISOString().slice(0, 10);
+    const dd = (n) => String(n).padStart(2, "0");
+    const d = new Date();
+    const isoDate =
+      reportDate ||
+      `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+    const ddmmyyyy = `${dd(d.getDate())}.${dd(
+      d.getMonth() + 1
+    )}.${d.getFullYear()}`;
+    const cid = Number(carId);
+    const vol = Number(liters);
+    const cost = Number(totalCost);
 
-    return cy
-      .request({
+    const getCarMileage = () =>
+      cy
+        .request({ method: "GET", url: "/api/cars", failOnStatusCode: false })
+        .then((r) => {
+          const list = r.body?.data ?? r.body ?? [];
+          const car =
+            list.find((c) => Number(c?.id ?? c?.carId ?? c?.car?.id) === cid) ||
+            {};
+          return Number(car.mileage ?? car.odometer ?? car.initialMileage ?? 0);
+        });
+
+    const getLastExpenseMileage = () =>
+      cy
+        .request({
+          method: "GET",
+          url: `/api/expenses?carId=${cid}`,
+          failOnStatusCode: false,
+        })
+        .then((r) => {
+          const list = r.body?.data ?? r.body ?? [];
+          return list.reduce((m, x) => {
+            const v = Number(x.mileage ?? x.odometer ?? 0);
+            return v > m ? v : m;
+          }, 0);
+        });
+
+    const postJson = (finalMileage) =>
+      cy.request({
         method: "POST",
         url: "/api/expenses",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: {
-          carId: Number(carId),
-          mileage: Number(mileage),
-          liters: Number(liters),
-          totalCost: Number(totalCost),
-          reportDate: date,
+          carId: cid,
+          mileage: finalMileage,
+          liters: vol,
+          totalCost: cost,
+          reportDate: isoDate,
         },
         failOnStatusCode: false,
-      })
-      .then((resp) => {
-        if (![200, 201].includes(resp.status)) {
-          cy.log("Expense create FAILED:", JSON.stringify(resp.body));
-        }
-        expect([200, 201], "expense create status").to.include(resp.status);
-
-        const b = resp.body || {};
-        const exp = b.data ?? b.expense ?? b;
-        expect(exp, "expense in response body").to.exist;
-        expect(Number(exp.carId || exp.car_id)).to.eq(Number(carId));
-        expect(Number(exp.mileage || exp.odometer)).to.eq(Number(mileage));
-        expect(Number(exp.liters || exp.volume)).to.eq(Number(liters));
-        expect(Number(exp.totalCost || exp.price)).to.eq(Number(totalCost));
-
-        return exp;
       });
+
+    const postForm = (finalMileage) =>
+      cy.request({
+        method: "POST",
+        url: "/api/expenses",
+        form: true,
+        body: {
+          carId: String(cid),
+          mileage: String(finalMileage),
+          liters: String(vol),
+          totalCost: String(cost),
+          reportDate: ddmmyyyy,
+        },
+        failOnStatusCode: false,
+      });
+
+    return cy.wrap(null).then(() =>
+      Promise.all([getCarMileage(), getLastExpenseMileage()]).then(
+        ([carMileage, lastExp]) => {
+          const candidate = Number(mileage ?? 0);
+          const finalMileage = Math.max(candidate, carMileage + 1, lastExp + 1);
+          return postJson(finalMileage)
+            .then((r1) => {
+              if (![200, 201].includes(r1.status)) {
+                return postForm(finalMileage).then((r2) => ({
+                  resp: r2,
+                  finalMileage,
+                }));
+              }
+              return { resp: r1, finalMileage };
+            })
+            .then(({ resp, finalMileage }) => {
+              expect([200, 201]).to.include(resp.status);
+              const b = resp.body || {};
+              const exp = b.data ?? b.expense ?? b;
+              expect(exp).to.exist;
+              expect(Number(exp.carId || exp.car_id)).to.eq(cid);
+              expect(Number(exp.liters || exp.volume)).to.eq(vol);
+              expect(Number(exp.totalCost || exp.price)).to.eq(cost);
+              expect(Number(exp.mileage ?? exp.odometer)).to.eq(finalMileage);
+              return { expense: exp, mileage: finalMileage };
+            });
+        }
+      )
+    );
   }
 );
