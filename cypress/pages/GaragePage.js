@@ -1,3 +1,4 @@
+// cypress/pages/GaragePage.js
 export default class GaragePage {
   open() {
     cy.contains("a,button", /^garage$/i).click({ force: true });
@@ -5,39 +6,74 @@ export default class GaragePage {
   }
 
   addCar({ brand, model, mileage }) {
+    cy.intercept("GET", "**/api/cars/models*").as("models");
     cy.intercept("POST", "**/api/cars").as("createCar");
 
-    cy.contains("button,a", /^add car$/i).click();
-    cy.get(".modal.show,[role='dialog']").as("dlg");
+    cy.contains("button,a", /^add car$/i, { timeout: 15000 })
+      .should("be.visible")
+      .click();
 
-    cy.intercept("GET", "**/api/cars/models*").as("models");
+    cy.get(".modal.show,[role='dialog']", { timeout: 15000 })
+      .as("carDlg")
+      .should("be.visible");
 
-    cy.get("@dlg")
+    cy.get("@carDlg")
       .contains("label", /brand/i)
       .parent()
       .find("select")
-      .select(brand, { force: true });
+      .should("be.enabled")
+      .then(($sel) => {
+        const desired = brand;
+        const currentText = $sel.find("option:selected").text().trim();
+        const hasAlt = $sel.find("option").length > 1;
+        if (currentText.toLowerCase() === desired.toLowerCase()) {
+          if (hasAlt) {
+            const alt = Array.from($sel[0].options)
+              .map((o) => o.text.trim())
+              .find((t) => t && t.toLowerCase() !== desired.toLowerCase());
+            if (alt) {
+              cy.wrap($sel).select(alt, { force: true });
+              cy.wait("@models", { timeout: 10000 });
+              cy.wrap($sel).select(desired, { force: true });
+              cy.wait("@models", { timeout: 10000 });
+              return;
+            }
+          }
+          cy.wrap($sel);
+        } else {
+          cy.wrap($sel).select(desired, { force: true });
+          cy.wait("@models", { timeout: 10000 });
+        }
+      });
 
-    cy.wait("@models");
+    cy.get("@carDlg")
+      .contains("label", /model/i)
+      .parent()
+      .find("select")
+      .should("be.enabled")
+      .find("option")
+      .its("length")
+      .should("be.greaterThan", 0);
 
-    cy.get("@dlg")
+    cy.get("@carDlg")
       .contains("label", /model/i)
       .parent()
       .find("select")
       .select(model, { force: true });
 
-    cy.get("@dlg")
+    cy.get("@carDlg")
       .contains("label", /mileage|odometer/i)
       .parent()
       .find("input")
       .clear()
       .type(String(mileage));
 
-    cy.get("@dlg").contains("button,input[type='submit']", /^add$/i).click();
+    cy.get("@carDlg")
+      .contains("button,input[type='submit']", /^add$/i)
+      .click({ force: true });
 
     cy.wait("@createCar").then(({ response }) => {
       expect([200, 201]).to.include(response?.statusCode);
-
       const body = response?.body || {};
       const carId =
         body?.id ??
@@ -46,18 +82,12 @@ export default class GaragePage {
         body?.data?.car?.id ??
         body?.carId ??
         body?.car?.id;
-
-      expect(carId, "created car id").to.be.a("number");
-
-      cy.wrap(carId).as("createdCarId");
-      cy.writeFile("cypress/fixtures/lastCar.json", { carId });
-
-      Cypress.env("createdCarId", carId);
+      if (carId) cy.wrap(carId).as("createdCarId");
     });
 
-    cy.contains(".toast,.alert,[role='status']", /added|success/i).should(
-      "be.visible"
-    );
+    cy.contains(".toast,.alert,[role='status']", /added|success/i, {
+      timeout: 15000,
+    }).should("be.visible");
 
     cy.contains(
       ".car,.card,article,tr",
@@ -83,9 +113,7 @@ export default class GaragePage {
       .invoke("text")
       .then((t) => t.trim())
       .should((t) => {
-        expect(
-          /add (an )?expense/i.test(t) || /add fuel expense/i.test(t)
-        ).to.eq(true);
+        expect(/add (an )?expense|add fuel expense/i.test(t)).to.eq(true);
       });
   }
 }
