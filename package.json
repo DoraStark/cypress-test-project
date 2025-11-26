@@ -28,6 +28,6 @@
   },
   "homepage": "https://github.com/DoraStark/cypress-test-project#readme",
   "devDependencies": {
-    "cypress": "^15.3.0"
+    "cypress": "13.6.4"
   }
 }
