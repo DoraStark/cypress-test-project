@@ -14,7 +14,7 @@
     "cy:qauto:spec": "cypress run --browser chrome --headless --config-file cypress.config.qauto.js --spec",
     "cy:qauto2:spec": "cypress run --browser chrome --headless --config-file cypress.config.qauto2.js --spec",
     "cy:both:run": "npm run cy:qauto:run && npm run cy:qauto2:run",
-    "cy:ci:run": "cypress run --browser chrome --headless --config-file cypress.config.qauto.js --spec cypress/e2e/ui/ci-smoke.cy.js"
+    "cy:ci:run": "cypress run --browser chrome --headless --config-file cypress.config.qauto.js --spec cypress/e2e/spec.cy.js"
   },
   "repository": {
     "type": "git",
