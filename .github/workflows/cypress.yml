@@ -20,5 +20,5 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run Cypress tests (qauto)
-        run: npm run cy:qauto:run
+      - name: Run Cypress tests (CI smoke)
+        run: npm run cy:ci:run
